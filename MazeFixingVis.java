@@ -87,11 +87,11 @@ public class MazeFixingVis {
         // preprocess: mark all border cells with *
         for (int r = 0; r < H; ++r)
         for (int c = 0; c < W; ++c) {
-            if (M[r][c] != '.')
-                continue;
-            for (i = 0; i < 4; ++i)
-                if (!outside(r + dr[i], c + dc[i]))
-                    M[r][c] = '*';
+            if (M[r][c] == '.') {
+              for (i = 0; i < 4; ++i)
+                  if (!outside(r + dr[i], c + dc[i]))
+                      M[r][c] = '*';
+            }
         }
       }
       catch (Exception e) { 
