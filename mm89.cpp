@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <cassert>
+#include <limits>
 #include <sys/time.h>
 using namespace std;
 #define REP(i, n) for (int i = 0; i < (int)(n); ++i)
@@ -119,7 +120,47 @@ struct MazeFixing {
 
   vector<string> Optimize() {
     double time_start = GetTime();
-    double time_elapsed = GetTime() - time_start;
+    double time_use = 9.0;
+    double time_end = time_start + time_use;
+    double time_current;
+
+    vector<string> best_status = M;
+    int best_score = GetScore(best_status);
+    vector<string> current_status = best_status;
+    int current_score = best_score;
+
+    while ((time_current = GetTime()) < time_end) {
+      int move_y = xrand() % H;
+      int move_x = xrand() % W;
+      if(current_status[move_y][move_x] == '.' || current_status[move_y][move_x] == 'E') continue;
+      vector<string> next_status = current_status;
+      char move_d = "SLUR"[xrand() % 4];
+      next_status[move_y][move_x] = move_d;
+      char c = 0;
+      REP(y,H) REP(x,W) if(next_status[y][x] != M[y][x]) ++c;
+      if(c > F) continue;
+      int next_score = GetScore(next_status);
+      if(best_score < next_score) {
+        best_score = next_score;
+        best_status = next_status;
+        cerr << "[" << time_current - time_start << "] best_score = " << best_score << endl;
+      }
+      double prob = 1.0 * xrand() / numeric_limits<unsigned long>::max();
+      bool force_next = time_use * prob < (time_end - time_current);
+      if(current_score < next_score || force_next) {
+        current_score = next_score;
+        current_status = next_status;
+        // cerr << "[" << time_current << "] current_score = " << current_score << endl;
+      }
+    }
+
+    vector<string> ret;
+    REP(y,H) REP(x,W) {
+      if(best_status[y][x] != M[y][x]) {
+        ret.push_back(to_string(y) + " " + to_string(x) + " " + best_status[y][x]);
+      }
+    }
+    return ret;
   }
 
   vector<string> Improve() {

@@ -1,2 +1,4 @@
 *.class
 mm89
+pprof.out
+pprof.callgrind
