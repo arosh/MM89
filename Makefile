@@ -1,3 +1,7 @@
+# -gを付けないとgperftoolsで関数名が見れなかった
+# CXX=g++-5
 # CXXFLAGS=-D_GLIBCXX_DEBUG -std=c++11 -Wall -Wextra -Wshadow -g
+# CXXFLAGS=-DENABLE_PROFILE -std=c++11 -Wall -Wextra -Wshadow -O2 -g
 CXXFLAGS=-std=c++11 -Wall -Wextra -Wshadow -O2 -g
-LDLIBS=-lprofiler
+# CXXFLAGS=-DNDEBUG -std=c++11 -Wall -Wextra -Wshadow -O2 -g
+# LDLIBS=-lprofiler
