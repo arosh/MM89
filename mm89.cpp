@@ -47,29 +47,25 @@ MazeCharType transform(const vector<string> &vs) {
 }
 
 struct Action {
-  int y, x, d, sgn;
+  char y, x, d, sgn;
   Action() {}
-  Action(int y_, int x_, int d_, int sgn_) : y(y_), x(x_), d(d_), sgn(sgn_) {}
+  Action(char y_, char x_, char d_, char sgn_) : y(y_), x(x_), d(d_), sgn(sgn_) {}
 };
 
 struct Solver {
   const MazeCharType M;
   const int F;
   const int H, W;
-  const int dy[4] = { 0, -1, 0, 1 };
-  const int dx[4] = { 1, 0, -1, 0 };
+  const char dy[4] = { 0, -1, 0, 1 };
+  const char dx[4] = { 1, 0, -1, 0 };
   MazeBoolType is_border;
   MazeBoolType visited_one_path;
   MazeBoolType visited_over_all;
   MazeBoolType visited_any_path;
   Solver(vector<string> M_, int F_) : M(transform(M_)), F(F_), H(M_.size()), W(M_[0].size()) {}
 
-  bool IsOutside(int y, int x) {
-    if (y < 0 || y >= H || x < 0 || x >= W)
-      return true;
-    if (M[y][x] == '.')
-      return true;
-    return false;
+  inline bool IsOutside(const char y, const char x) {
+    return M[y][x] == '.' || y < 0 || y >= H || x < 0 || x >= W;
   }
 
   void FillFalse(MazeBoolType &ary) {
@@ -104,15 +100,15 @@ struct Solver {
     }
   }
 
-  void Follow(const MazeCharType &maze, int start_y, int start_x, int start_d) {
+  void Follow(const MazeCharType &maze, const char start_y, const char start_x, const char start_d) {
     static Action stk[4 * 80 * 80];
     int stk_size = 0;
     stk[stk_size++] = Action(start_y, start_x, start_d, 1);
     while (stk_size) {
       Action cur = stk[--stk_size];
-      int y = cur.y;
-      int x = cur.x;
-      int d = cur.d;
+      char y = cur.y;
+      char x = cur.x;
+      char d = cur.d;
       if (cur.sgn > 0) {
         if (visited_one_path[y][x]) {
           // check loop
@@ -126,7 +122,7 @@ struct Solver {
           visited_one_path[y][x] = true;
           visited_any_path[y][x] = true;
           assert(IsOutside(y, x) == false);
-          int nd = -1;
+          char nd = -1;
           switch (maze[y][x]) {
           case 'S':
             nd = (d + 0) & 3;
@@ -213,8 +209,8 @@ struct Solver {
       const MazeCharType &status,
       const MazeBoolType &visited,
       const MazeBoolType &pointed,
-      vector<int> &ys,
-      vector<int> &xs) {
+      vector<char> &ys,
+      vector<char> &xs) {
     assert(ys.empty());
     assert(xs.empty());
     REP(y, H) {
@@ -247,6 +243,23 @@ struct Solver {
     return seq;
   }
 
+  void FillU(MazeCharType &status) {
+    Search(status);
+    REP(y,H) {
+      REP(x,W) {
+        if(is_border[y][x]) {
+          REP(i,4) {
+            int ny = y + dy[i];
+            int nx = x + dx[i];
+            if(IsOutside(ny, nx) == false && visited_over_all[ny][nx] == false) {
+              status[ny][nx] = 'U';
+            }
+          }
+        }
+      }
+    }
+  }
+
   vector<string> Optimize() {
     double time_start = gettime();
     double time_use = 9.8;
@@ -263,7 +276,7 @@ struct Solver {
     // int current_fixed = CountFixedCell(current_status);
 
     while ((time_current = gettime()) < time_end) {
-      vector<int> ys, xs;
+      vector<char> ys, xs;
       CreateCandidatePoint(current_status, current_visited, current_pointed, ys, xs);
       assert(xs.size() == ys.size());
       MazeCharType next_status = current_status;
@@ -273,9 +286,9 @@ struct Solver {
       // const int mul = min<int>(xs.size(), max<int>(1, 100 * (time_end - time_current) / time_use));
       REP(i, mul) {
         int rand_index = xrand() % xs.size();
-        int move_y = ys[rand_index];
-        int move_x = xs[rand_index];
-        char move_d = "SLUR"[xrand() % 4];
+        char move_y = ys[rand_index];
+        char move_x = xs[rand_index];
+        char move_d = "SLR"[xrand() % 3];
         char tmp = next_status[move_y][move_x];
         next_status[move_y][move_x] = move_d;
         if (CountFixedCell(next_status) > F) {
@@ -295,7 +308,7 @@ struct Solver {
       int next_potential = 10000 * next_score + GetCanMove();
       // bool force_next = xrand() / (1.0 + ULONG_MAX) < (time_end - time_current)/time_use;
       bool force_next = false;
-      if (current_potential < next_potential || force_next) {
+      if (current_potential <= next_potential || force_next) {
         current_potential = next_potential;
         current_status = next_status;
         current_visited = visited_any_path;
@@ -304,6 +317,8 @@ struct Solver {
         // cerr << "[" << time_current - time_start << "] current_potential = " << current_potential << endl;
       }
     }
+
+    FillU(best_status);
 
     vector<string> ret;
     REP(y, H) {

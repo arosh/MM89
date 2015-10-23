@@ -3,4 +3,4 @@ mm89
 mm89.dSYM
 pprof.out
 pprof.callgrind
-callgrind.out.*
+callgrind.out
