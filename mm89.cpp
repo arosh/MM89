@@ -194,7 +194,7 @@ struct Solver {
     return c;
   }
 
-  int CountFixedCell(const MazeCharType &maze) {
+  int CountFixedCells(const MazeCharType &maze) {
     int fixed = 0;
     REP(y, H) {
       REP(x, W) {
@@ -245,18 +245,85 @@ struct Solver {
 
   void FillU(MazeCharType &status) {
     Search(status);
-    REP(y,H) {
-      REP(x,W) {
-        if(is_border[y][x]) {
-          REP(i,4) {
+    int rem = F - CountFixedCells(status);
+    if(rem == 0) return;
+    REP(y, H) {
+      REP(x, W) {
+        if (is_border[y][x]) {
+          REP(i, 4) {
             int ny = y + dy[i];
             int nx = x + dx[i];
-            if(IsOutside(ny, nx) == false && visited_over_all[ny][nx] == false) {
+            if (IsOutside(ny, nx) == false && visited_over_all[ny][nx] == false && status[ny][nx] != 'U') {
               status[ny][nx] = 'U';
+              rem--;
+              if(rem == 0) return;
             }
           }
         }
       }
+    }
+  }
+
+  bool MoveNext(
+      const MazeCharType &current_status,
+      const MazeBoolType &current_visited,
+      const MazeBoolType &current_pointed,
+      MazeCharType &next_status) {
+    vector<char> ys, xs;
+    CreateCandidatePoint(current_status, current_visited, current_pointed, ys, xs);
+    assert(xs.size() == ys.size());
+    if (xs.size() == 0)
+      return false;
+
+    next_status = current_status;
+    int rand_index = xrand() % xs.size();
+    char move_y = ys[rand_index];
+    char move_x = xs[rand_index];
+    char move_d = "SLR"[xrand() % 3];
+    next_status[move_y][move_x] = move_d;
+    return true;
+  }
+
+  void RandomReset(
+      const MazeCharType &current_status,
+      const MazeBoolType &current_visited,
+      const MazeBoolType &current_pointed,
+      MazeCharType &next_status) {
+    next_status = current_status;
+    vector<char> vy, vx, py, px, cy, cx;
+    REP(y, H) {
+      REP(x, W) {
+        if(current_status[y][x] != M[y][x]) {
+          if(current_visited[y][x] == false) {
+            vy.push_back(y);
+            vx.push_back(x);
+          }
+          if(current_pointed[y][x] == false) {
+            py.push_back(y);
+            px.push_back(x);
+          }
+          cy.push_back(y);
+          cx.push_back(x);
+        }
+      }
+    }
+    if(vy.size() > 0) {
+      int r = xrand() % vy.size();
+      char y = vy[r], x = vx[r];
+      next_status[y][x] = M[y][x];
+      return;
+    }
+    if(py.size() > 0) {
+      int r = xrand() % py.size();
+      char y = py[r], x = px[r];
+      next_status[y][x] = M[y][x];
+      return;
+    }
+    if(cy.size() > 0) {
+      int r = xrand() % cy.size();
+      char y = cy[r], x = cx[r];
+      next_status[y][x] = M[y][x];
+      return;
     }
   }
 
@@ -273,48 +340,43 @@ struct Solver {
     int current_potential = 10000 * best_score + GetCanMove();
     MazeBoolType current_visited = visited_any_path;
     MazeBoolType current_pointed = visited_over_all;
-    // int current_fixed = CountFixedCell(current_status);
+    int current_fixed_cells = CountFixedCells(current_status);
 
     while ((time_current = gettime()) < time_end) {
-      vector<char> ys, xs;
-      CreateCandidatePoint(current_status, current_visited, current_pointed, ys, xs);
-      assert(xs.size() == ys.size());
-      MazeCharType next_status = current_status;
-      const int mul = 1;
-      // const int mul = 100;
-      // const int mul = min<int>(xs.size(), max<int>(1, 0.005 * (F - current_fixed)));
-      // const int mul = min<int>(xs.size(), max<int>(1, 100 * (time_end - time_current) / time_use));
-      REP(i, mul) {
-        int rand_index = xrand() % xs.size();
-        char move_y = ys[rand_index];
-        char move_x = xs[rand_index];
-        char move_d = "SLR"[xrand() % 3];
-        char tmp = next_status[move_y][move_x];
-        next_status[move_y][move_x] = move_d;
-        if (CountFixedCell(next_status) > F) {
-          next_status[move_y][move_x] = tmp;
-          break;
-        }
-      }
-      Search(next_status);
-      int next_score = GetScore();
-      if (best_score < next_score) {
-        best_score = next_score;
-        best_status = next_status;
-#ifdef LOCAL
-        cerr << "[" << time_current - time_start << "] best_score = " << best_score << endl;
-#endif
-      }
-      int next_potential = 10000 * next_score + GetCanMove();
-      // bool force_next = xrand() / (1.0 + ULONG_MAX) < (time_end - time_current)/time_use;
-      bool force_next = false;
-      if (current_potential <= next_potential || force_next) {
+      if (current_fixed_cells == F) {
+        MazeCharType next_status;
+        RandomReset(current_status, current_visited, current_pointed, next_status);
+        Search(next_status);
+        int next_potential = 10000 * GetScore() + GetCanMove();
         current_potential = next_potential;
         current_status = next_status;
         current_visited = visited_any_path;
         current_pointed = visited_over_all;
-        // current_fixed = CountFixedCell(next_status);
-        // cerr << "[" << time_current - time_start << "] current_potential = " << current_potential << endl;
+        current_fixed_cells = CountFixedCells(next_status);
+      } else {
+        MazeCharType next_status;
+        bool ret = MoveNext(current_status, current_visited, current_pointed, next_status);
+        if(ret == false) break;
+        Search(next_status);
+        int next_score = GetScore();
+        int next_potential = 10000 * next_score + GetCanMove();
+        if (best_score < next_score) {
+          best_score = next_score;
+          best_status = next_status;
+#ifdef LOCAL
+          cerr << "[" << time_current - time_start << "] best_score = " << best_score << endl;
+#endif
+        }
+        // bool force_next = xrand() / (1.0 + ULONG_MAX) < (time_end - time_current)/time_use;
+        bool force_next = false;
+        if (current_potential <= next_potential || force_next) {
+          current_potential = next_potential;
+          current_status = next_status;
+          current_visited = visited_any_path;
+          current_pointed = visited_over_all;
+          current_fixed_cells = CountFixedCells(next_status);
+          // cerr << "[" << time_current - time_start << "] current_potential = " << current_potential << endl;
+        }
       }
     }
 
