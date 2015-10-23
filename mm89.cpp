@@ -1,9 +1,8 @@
+#include <cassert>
 #include <iostream>
 #include <algorithm>
 #include <vector>
 #include <string>
-#include <cassert>
-#include <limits>
 #include <stack>
 #include <sys/time.h>
 #ifdef ENABLE_PROFILE
@@ -29,14 +28,24 @@ unsigned long xrand() {
   return w = (w ^ (w >> 19)) ^ (t ^ (t >> 8));
 }
 
+vector<vector<char>> transform(const vector<string> &vs) {
+  vector<vector<char>> vvc(vs.size(), vector<char>(vs[0].size()));
+  REP(i, vs.size()) {
+    REP(j, vs[i].size()) {
+      vvc[i][j] = vs[i][j];
+    }
+  }
+  return vvc;
+}
+
 struct Action {
   int y, x, d, sgn;
   Action() {}
   Action(int y_, int x_, int d_, int sgn_) : y(y_), x(x_), d(d_), sgn(sgn_) {}
 };
 
-struct MazeFixing {
-  const vector<string> M;
+struct Solver {
+  const vector<vector<char>> M;
   const int F;
   const int H, W;
   const int dy[4] = { 0, -1, 0, 1 };
@@ -45,7 +54,8 @@ struct MazeFixing {
   vector<vector<bool>> visited_one_path;
   vector<vector<bool>> visited_over_all;
   vector<vector<bool>> visited_any_path;
-  MazeFixing(vector<string> M_, int F_) : M(M_), F(F_), H(M_.size()), W(M_[0].size()) {}
+  vector<vector<bool>> border_visited;
+  Solver(vector<string> M_, int F_) : M(transform(M_)), F(F_), H(M_.size()), W(M_[0].size()) {}
 
   bool IsOutside(int y, int x) {
     if (y < 0 || y >= H || x < 0 || x >= W)
@@ -78,7 +88,9 @@ struct MazeFixing {
     }
   }
 
-  void Follow(const vector<string> &maze, int start_y, int start_x, int start_d) {
+  void Follow(const vector<vector<char>> &maze, int start_y, int start_x, int start_d) {
+    if (border_visited[start_y][start_x])
+      return;
     stack<Action> stk;
     stk.emplace(start_y, start_x, start_d, 1);
     while (!stk.empty()) {
@@ -97,6 +109,7 @@ struct MazeFixing {
         visited_any_path[y][x] = true;
         if (is_border[y][x]) {
           // goal
+          border_visited[y][x] = true;
           FillVisitedOverAll();
         } else {
           assert(IsOutside(y, x) == false);
@@ -121,10 +134,11 @@ struct MazeFixing {
     }
   }
 
-  void Search(const vector<string> &maze) {
+  void Search(const vector<vector<char>> &maze) {
     visited_one_path.assign(H, vector<bool>(W, false));
     visited_over_all.assign(H, vector<bool>(W, false));
     visited_any_path.assign(H, vector<bool>(W, false));
+    border_visited.assign(H, vector<bool>(W, false));
     REP(y, H) {
       REP(x, W) {
         if (is_border[y][x]) {
@@ -138,7 +152,7 @@ struct MazeFixing {
     }
   }
 
-  int GetScore(const vector<string> &maze) {
+  int GetScore(const vector<vector<char>> &maze) {
     Search(maze);
     int c = 0;
     REP(y, H) {
@@ -150,7 +164,7 @@ struct MazeFixing {
     return c;
   }
 
-  int GetScorePlusCanMove(const vector<string> &maze) {
+  int GetScorePlusCanMove(const vector<vector<char>> &maze) {
     int c = GetScore(maze);
     REP(y, H) {
       REP(x, W) {
@@ -161,18 +175,19 @@ struct MazeFixing {
     return c;
   }
 
-  int CountFixedCell(const vector<string> &maze) {
+  int CountFixedCell(const vector<vector<char>> &maze) {
     int fixed = 0;
     REP(y, H) {
       REP(x, W) {
-        if (maze[y][x] != M[y][x]) ++fixed;
+        if (maze[y][x] != M[y][x])
+          ++fixed;
       }
     }
     return fixed;
   }
 
   void CreateCandidatePoint(
-      const vector<string> &status,
+      const vector<vector<char>> &status,
       const vector<vector<bool>> &visited,
       const vector<vector<bool>> &pointed,
       vector<int> &ys,
@@ -181,13 +196,14 @@ struct MazeFixing {
     assert(xs.empty());
     REP(y, H) {
       REP(x, W) {
-        if(status[y][x] != '.' &&
-           status[y][x] != 'E' &&
-           visited[y][x]) {
+        if (status[y][x] != '.' &&
+            status[y][x] != 'E' &&
+            visited[y][x]) {
           REP(i, 4) {
-            if(IsOutside(y + dy[i], x + dx[i]) == false && pointed[y+dy[i]][x+dx[i]] == false) {
+            if (IsOutside(y + dy[i], x + dx[i]) == false && pointed[y + dy[i]][x + dx[i]] == false) {
               ys.push_back(y);
               xs.push_back(x);
+              break;
             }
           }
         }
@@ -197,13 +213,13 @@ struct MazeFixing {
 
   vector<string> Optimize() {
     double time_start = gettime();
-    double time_use = 9.0;
+    double time_use = 9.5;
     double time_end = time_start + time_use;
     double time_current;
 
-    vector<string> best_status = M;
+    vector<vector<char>> best_status = M;
     int best_score = GetScore(best_status);
-    vector<string> current_status = best_status;
+    vector<vector<char>> current_status = best_status;
     int current_score = best_score;
     vector<vector<bool>> current_visited = visited_any_path;
     vector<vector<bool>> current_pointed = visited_over_all;
@@ -215,7 +231,7 @@ struct MazeFixing {
       int rand_index = xrand() % ys.size();
       int move_y = ys[rand_index];
       int move_x = xs[rand_index];
-      vector<string> next_status = current_status;
+      vector<vector<char>> next_status = current_status;
       char move_d = "SLUR"[xrand() % 4];
       next_status[move_y][move_x] = move_d;
       if (CountFixedCell(next_status) > F)
@@ -224,10 +240,13 @@ struct MazeFixing {
       if (best_score < next_score) {
         best_score = next_score;
         best_status = next_status;
+#ifndef NDEBUG
         cerr << "[" << time_current - time_start << "] best_score = " << best_score << endl;
+#endif
       }
-      double prob = 1.0 * xrand() / numeric_limits<unsigned long>::max();
-      bool force_next = time_use * prob < (time_end - time_current);
+      double prob = 1.0 * xrand() / ULONG_MAX;
+      // bool force_next = time_use * prob < (time_end - time_current);
+      bool force_next = false;
       if (current_score < next_score || force_next) {
         current_score = next_score;
         current_status = next_status;
@@ -245,8 +264,9 @@ struct MazeFixing {
         }
       }
     }
-    DEBUG(ret.size());
-    DEBUG(F);
+#ifndef NDEBUG
+    cerr << "R/F = " << ret.size() << "/" << F << endl;
+#endif
     assert((int)ret.size() <= F);
     return ret;
   }
@@ -257,11 +277,17 @@ struct MazeFixing {
   }
 };
 
+struct MazeFixing {
+  vector<string> improve(vector<string> maze, int F) {
+    return Solver(maze, F).Improve();
+  }
+};
+
 vector<string> improve(vector<string> maze, int F) {
 #ifdef ENABLE_PROFILE
   ProfilerStart("./pprof.out");
 #endif
-  return MazeFixing(maze, F).Improve();
+  return Solver(maze, F).Improve();
 #ifdef ENABLE_PROFILE
   ProfilerStop();
 #endif
