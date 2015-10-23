@@ -1,4 +1,8 @@
+#ifndef LOCAL
+#define NDEBUG
+#endif
 #include <cassert>
+#include <climits>
 #include <iostream>
 #include <algorithm>
 #include <vector>
@@ -83,7 +87,9 @@ struct Solver {
   void FillVisitedOverAll() {
     REP(y, H) {
       REP(x, W) {
-        visited_over_all[y][x] = visited_over_all[y][x] || visited_one_path[y][x];
+        if(visited_one_path[y][x]) {
+          visited_over_all[y][x] = true;
+        }
       }
     }
   }
@@ -293,6 +299,7 @@ vector<string> improve(vector<string> maze, int F) {
 #endif
 }
 
+#if LOCAL
 int main() {
   // height: [10, 80]
   int H;
@@ -312,3 +319,4 @@ int main() {
   }
   cout.flush();
 }
+#endif
