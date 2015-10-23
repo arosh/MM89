@@ -13,6 +13,7 @@ java MazeFixingVis -exec ./mm89 -seed 1 -debug -vis
 * 既にF個変えてしまった時の処理
 * 到達可能なマスを入れ替えたほうが効率が良い
 * "A path can visit any cell only once, but different paths can visit same cell." なので，'S'でループになってもアウト
+* せめてあと5倍は早くしよう
 * Fを使い切れていない。Greedyに到達マスを増やしてから焼きなまし？
 
 # How to profile
@@ -24,7 +25,7 @@ google-pprof --callgrind mm89 pprof.out > pprof.callgrind 2> /dev/null && kcache
 ```
 
 ```
-java MazeFixingVis -exec "valgrind --tool=callgrind ./mm89" -vis -debug -seed 2
+java MazeFixingVis -exec "valgrind --tool=callgrind --callgrind-out-file=callgrind.out ./mm89" -vis -debug -seed 2
 ```
 
 # References

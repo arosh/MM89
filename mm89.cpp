@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <vector>
 #include <string>
-#include <stack>
+#include <deque>
 #include <sys/time.h>
 #ifdef ENABLE_PROFILE
 #include <gperftools/profiler.h>
@@ -58,7 +58,6 @@ struct Solver {
   vector<vector<bool>> visited_one_path;
   vector<vector<bool>> visited_over_all;
   vector<vector<bool>> visited_any_path;
-  vector<vector<bool>> border_visited;
   Solver(vector<string> M_, int F_) : M(transform(M_)), F(F_), H(M_.size()), W(M_[0].size()) {}
 
   bool IsOutside(int y, int x) {
@@ -95,13 +94,11 @@ struct Solver {
   }
 
   void Follow(const vector<vector<char>> &maze, int start_y, int start_x, int start_d) {
-    if (border_visited[start_y][start_x])
-      return;
-    stack<Action> stk;
-    stk.emplace(start_y, start_x, start_d, 1);
+    deque<Action> stk;
+    stk.emplace_back(start_y, start_x, start_d, 1);
     while (!stk.empty()) {
-      Action cur = stk.top();
-      stk.pop();
+      Action cur = stk.back();
+      stk.pop_back();
       int y = cur.y;
       int x = cur.x;
       int d = cur.d;
@@ -110,12 +107,11 @@ struct Solver {
           // check loop
           continue;
         }
-        stk.emplace(y, x, d, -1);
+        stk.emplace_back(y, x, d, -1);
         visited_one_path[y][x] = true;
         visited_any_path[y][x] = true;
         if (is_border[y][x]) {
           // goal
-          border_visited[y][x] = true;
           FillVisitedOverAll();
         } else {
           assert(IsOutside(y, x) == false);
@@ -125,10 +121,10 @@ struct Solver {
               nd = (d + i) % 4;
           }
           if (nd != -1) {
-            stk.emplace(y + dy[nd], x + dx[nd], nd, 1);
+            stk.emplace_back(y + dy[nd], x + dx[nd], nd, 1);
           } else if (maze[y][x] == 'E') {
             REP(i, 4) {
-              stk.emplace(y + dy[i], x + dx[i], i, 1);
+              stk.emplace_back(y + dy[i], x + dx[i], i, 1);
             }
           } else {
             assert(false);
@@ -144,7 +140,6 @@ struct Solver {
     visited_one_path.assign(H, vector<bool>(W, false));
     visited_over_all.assign(H, vector<bool>(W, false));
     visited_any_path.assign(H, vector<bool>(W, false));
-    border_visited.assign(H, vector<bool>(W, false));
     REP(y, H) {
       REP(x, W) {
         if (is_border[y][x]) {
@@ -219,7 +214,7 @@ struct Solver {
 
   vector<string> Optimize() {
     double time_start = gettime();
-    double time_use = 9.5;
+    double time_use = 100;
     double time_end = time_start + time_use;
     double time_current;
 
