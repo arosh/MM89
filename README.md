@@ -16,6 +16,10 @@ java MazeFixingVis -exec ./mm89 -seed 1 -debug -vis
 * せめてあと5倍は早くしよう
 * Fを使い切れていない。Greedyに到達マスを増やしてから焼きなまし？
 * 正確な評価難しいよね？？？高速化できなくね？？？
+* 拡張風景をビジュアライズする
+* 少ブロックに分割してそれぞれを焼きなまし？
+* あるマスにある方向から入るとゴールにいけるかどうかを計算
+* そのマスに来るためにはどのマスのどの方向から入る必要があるかを計算
 
 # How to profile
 
@@ -28,6 +32,12 @@ google-pprof --callgrind mm89 pprof.out > pprof.callgrind 2> /dev/null && kcache
 ```
 java MazeFixingVis -exec "valgrind --tool=callgrind --callgrind-out-file=callgrind.out ./mm89" -vis -debug -seed 2
 ```
+
+```
+java MazeFixingVis -exec "perf record -o perf.data ./mm89" -vis -debug -seed 10
+```
+
+デフォルトで出力ファイル名はperf.dataだが、-oで指定しないと標準出力に変なものが増える
 
 # References
 

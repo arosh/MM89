@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <deque>
+#include <array>
 #include <sys/time.h>
 #ifdef ENABLE_PROFILE
 #include <gperftools/profiler.h>
@@ -32,14 +33,17 @@ unsigned long xrand() {
   return w = (w ^ (w >> 19)) ^ (t ^ (t >> 8));
 }
 
-vector<vector<char>> transform(const vector<string> &vs) {
-  vector<vector<char>> vvc(vs.size(), vector<char>(vs[0].size()));
+typedef array<array<char, 80>, 80> MazeCharType;
+typedef array<array<bool, 80>, 80> MazeBoolType;
+
+MazeCharType transform(const vector<string> &vs) {
+  MazeCharType ary;
   REP(i, vs.size()) {
     REP(j, vs[i].size()) {
-      vvc[i][j] = vs[i][j];
+      ary[i][j] = vs[i][j];
     }
   }
-  return vvc;
+  return ary;
 }
 
 struct Action {
@@ -49,15 +53,15 @@ struct Action {
 };
 
 struct Solver {
-  const vector<vector<char>> M;
+  const MazeCharType M;
   const int F;
   const int H, W;
   const int dy[4] = { 0, -1, 0, 1 };
   const int dx[4] = { 1, 0, -1, 0 };
-  vector<vector<bool>> is_border;
-  vector<vector<bool>> visited_one_path;
-  vector<vector<bool>> visited_over_all;
-  vector<vector<bool>> visited_any_path;
+  MazeBoolType is_border;
+  MazeBoolType visited_one_path;
+  MazeBoolType visited_over_all;
+  MazeBoolType visited_any_path;
   Solver(vector<string> M_, int F_) : M(transform(M_)), F(F_), H(M_.size()), W(M_[0].size()) {}
 
   bool IsOutside(int y, int x) {
@@ -68,8 +72,16 @@ struct Solver {
     return false;
   }
 
+  void FillFalse(MazeBoolType &ary) {
+    REP(y, H) {
+      REP(x, W) {
+        ary[y][x] = false;
+      }
+    }
+  }
+
   void SetUpBorder() {
-    is_border.assign(H, vector<bool>(W, false));
+    FillFalse(is_border);
     REP(y, H) {
       REP(x, W) {
         if (M[y][x] == '.') {
@@ -83,22 +95,21 @@ struct Solver {
     }
   }
 
-  void FillVisitedOverAll() {
-    REP(y, H) {
-      REP(x, W) {
-        if(visited_one_path[y][x]) {
-          visited_over_all[y][x] = true;
-        }
+  void FillVisitedOverAll(const Action stk[], const int size) {
+    REP(i, size) {
+      const Action &a = stk[i];
+      if (a.sgn == -1) {
+        visited_over_all[a.y][a.x] = true;
       }
     }
   }
 
-  void Follow(const vector<vector<char>> &maze, int start_y, int start_x, int start_d) {
-    deque<Action> stk;
-    stk.emplace_back(start_y, start_x, start_d, 1);
-    while (!stk.empty()) {
-      Action cur = stk.back();
-      stk.pop_back();
+  void Follow(const MazeCharType &maze, int start_y, int start_x, int start_d) {
+    static Action stk[4 * 80 * 80];
+    int stk_size = 0;
+    stk[stk_size++] = Action(start_y, start_x, start_d, 1);
+    while (stk_size) {
+      Action cur = stk[--stk_size];
       int y = cur.y;
       int x = cur.x;
       int d = cur.d;
@@ -107,28 +118,40 @@ struct Solver {
           // check loop
           continue;
         }
-        stk.emplace_back(y, x, d, -1);
         if (is_border[y][x]) {
           // goal
-          FillVisitedOverAll();
+          FillVisitedOverAll(stk, stk_size);
         } else {
+          stk[stk_size++] = Action(y, x, d, -1);
           visited_one_path[y][x] = true;
           visited_any_path[y][x] = true;
           assert(IsOutside(y, x) == false);
           int nd = -1;
-          REP(i, 4) {
-            if ("SLUR"[i] == maze[y][x])
-              nd = (d + i) % 4;
+          switch (maze[y][x]) {
+          case 'S':
+            nd = (d + 0) & 3;
+            break;
+          case 'L':
+            nd = (d + 1) & 3;
+            break;
+          case 'U':
+            nd = (d + 2) & 3;
+            break;
+          case 'R':
+            nd = (d + 3) & 3;
+            break;
           }
           if (nd != -1) {
-            stk.emplace_back(y + dy[nd], x + dx[nd], nd, 1);
-          } else if (maze[y][x] == 'E') {
-            REP(i, 4) {
-              stk.emplace_back(y + dy[i], x + dx[i], i, 1);
-            }
-          } else {
+            stk[stk_size++] = Action(y + dy[nd], x + dx[nd], nd, 1);
+          } else /* if (maze[y][x] == 'E') */ {
+            stk[stk_size + 0] = Action(y + 0, x + 1, 0, 1);
+            stk[stk_size + 1] = Action(y - 1, x + 0, 1, 1);
+            stk[stk_size + 2] = Action(y + 0, x - 1, 2, 1);
+            stk[stk_size + 3] = Action(y + 1, x + 0, 3, 1);
+            stk_size += 4;
+          } /* else {
             assert(false);
-          }
+          } */
         }
       } else {
         visited_one_path[y][x] = false;
@@ -136,10 +159,10 @@ struct Solver {
     }
   }
 
-  void Search(const vector<vector<char>> &maze) {
-    visited_one_path.assign(H, vector<bool>(W, false));
-    visited_over_all.assign(H, vector<bool>(W, false));
-    visited_any_path.assign(H, vector<bool>(W, false));
+  void Search(const MazeCharType &maze) {
+    FillFalse(visited_one_path);
+    FillFalse(visited_over_all);
+    FillFalse(visited_any_path);
     REP(y, H) {
       REP(x, W) {
         if (is_border[y][x]) {
@@ -175,7 +198,7 @@ struct Solver {
     return c;
   }
 
-  int CountFixedCell(const vector<vector<char>> &maze) {
+  int CountFixedCell(const MazeCharType &maze) {
     int fixed = 0;
     REP(y, H) {
       REP(x, W) {
@@ -187,9 +210,9 @@ struct Solver {
   }
 
   void CreateCandidatePoint(
-      const vector<vector<char>> &status,
-      const vector<vector<bool>> &visited,
-      const vector<vector<bool>> &pointed,
+      const MazeCharType &status,
+      const MazeBoolType &visited,
+      const MazeBoolType &pointed,
       vector<int> &ys,
       vector<int> &xs) {
     assert(ys.empty());
@@ -213,42 +236,42 @@ struct Solver {
 
   vector<int> Sample(int n, int k) {
     vector<int> seq(n);
-    REP(i,n) {
+    REP(i, n) {
       seq[i] = i;
     }
-    for(int i = n - 1; i > 0; --i) {
+    for (int i = n - 1; i > 0; --i) {
       swap(seq[i], seq[xrand() % (i + 1)]);
     }
-    seq.erase(seq.begin()+k, seq.end());
+    seq.erase(seq.begin() + k, seq.end());
     assert((int)seq.size() == k);
     return seq;
   }
 
   vector<string> Optimize() {
     double time_start = gettime();
-    double time_use = 9.5;
+    double time_use = 9.8;
     double time_end = time_start + time_use;
     double time_current;
 
-    vector<vector<char>> best_status = M;
+    MazeCharType best_status = M;
     Search(best_status);
     int best_score = GetScore();
-    vector<vector<char>> current_status = best_status;
-    int current_potential = 10000*best_score + GetCanMove();
-    vector<vector<bool>> current_visited = visited_any_path;
-    vector<vector<bool>> current_pointed = visited_over_all;
-    int current_fixed = CountFixedCell(current_status);
+    MazeCharType current_status = best_status;
+    int current_potential = 10000 * best_score + GetCanMove();
+    MazeBoolType current_visited = visited_any_path;
+    MazeBoolType current_pointed = visited_over_all;
+    // int current_fixed = CountFixedCell(current_status);
 
     while ((time_current = gettime()) < time_end) {
       vector<int> ys, xs;
       CreateCandidatePoint(current_status, current_visited, current_pointed, ys, xs);
       assert(xs.size() == ys.size());
-      vector<vector<char>> next_status = current_status;
+      MazeCharType next_status = current_status;
       const int mul = 1;
       // const int mul = 100;
       // const int mul = min<int>(xs.size(), max<int>(1, 0.005 * (F - current_fixed)));
       // const int mul = min<int>(xs.size(), max<int>(1, 100 * (time_end - time_current) / time_use));
-      REP(i,mul) {
+      REP(i, mul) {
         int rand_index = xrand() % xs.size();
         int move_y = ys[rand_index];
         int move_x = xs[rand_index];
@@ -269,7 +292,7 @@ struct Solver {
         cerr << "[" << time_current - time_start << "] best_score = " << best_score << endl;
 #endif
       }
-      int next_potential = 10000*next_score + GetCanMove();
+      int next_potential = 10000 * next_score + GetCanMove();
       // bool force_next = xrand() / (1.0 + ULONG_MAX) < (time_end - time_current)/time_use;
       bool force_next = false;
       if (current_potential < next_potential || force_next) {
@@ -277,7 +300,7 @@ struct Solver {
         current_status = next_status;
         current_visited = visited_any_path;
         current_pointed = visited_over_all;
-        current_fixed = CountFixedCell(next_status);
+        // current_fixed = CountFixedCell(next_status);
         // cerr << "[" << time_current - time_start << "] current_potential = " << current_potential << endl;
       }
     }
@@ -304,9 +327,9 @@ struct Solver {
 #endif
     vector<string> ret = Optimize();
 #ifdef ENABLE_PROFILE
-  ProfilerStop();
+    ProfilerStop();
 #endif
-  return ret;
+    return ret;
   }
 };
 
