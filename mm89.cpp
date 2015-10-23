@@ -163,7 +163,7 @@ struct Solver {
       REP(x, W) {
         if (is_border[y][x]) {
           REP(i, 4) {
-            if (IsOutside(y + dy[i], x + dx[i]) == false && M[y + dy[i]][x + dx[i]] != '.') {
+            if (IsOutside(y + dy[i], x + dx[i]) == false) {
               Follow(maze, y + dy[i], x + dx[i], i);
             }
           }
@@ -246,7 +246,8 @@ struct Solver {
   void FillU(MazeCharType &status) {
     Search(status);
     int rem = F - CountFixedCells(status);
-    if(rem == 0) return;
+    if (rem == 0)
+      return;
     REP(y, H) {
       REP(x, W) {
         if (is_border[y][x]) {
@@ -256,7 +257,8 @@ struct Solver {
             if (IsOutside(ny, nx) == false && visited_over_all[ny][nx] == false && status[ny][nx] != 'U') {
               status[ny][nx] = 'U';
               rem--;
-              if(rem == 0) return;
+              if (rem == 0)
+                return;
             }
           }
         }
@@ -293,12 +295,12 @@ struct Solver {
     vector<char> vy, vx, py, px, cy, cx;
     REP(y, H) {
       REP(x, W) {
-        if(current_status[y][x] != M[y][x]) {
-          if(current_visited[y][x] == false) {
+        if (current_status[y][x] != M[y][x]) {
+          if (current_visited[y][x] == false) {
             vy.push_back(y);
             vx.push_back(x);
           }
-          if(current_pointed[y][x] == false) {
+          if (current_pointed[y][x] == false) {
             py.push_back(y);
             px.push_back(x);
           }
@@ -307,19 +309,19 @@ struct Solver {
         }
       }
     }
-    if(vy.size() > 0) {
+    if (vy.size() > 0) {
       int r = xrand() % vy.size();
       char y = vy[r], x = vx[r];
       next_status[y][x] = M[y][x];
       return;
     }
-    if(py.size() > 0) {
+    if (py.size() > 0) {
       int r = xrand() % py.size();
       char y = py[r], x = px[r];
       next_status[y][x] = M[y][x];
       return;
     }
-    if(cy.size() > 0) {
+    if (cy.size() > 0) {
       int r = xrand() % cy.size();
       char y = cy[r], x = cx[r];
       next_status[y][x] = M[y][x];
@@ -356,7 +358,8 @@ struct Solver {
       } else {
         MazeCharType next_status;
         bool ret = MoveNext(current_status, current_visited, current_pointed, next_status);
-        if(ret == false) break;
+        if (ret == false)
+          break;
         Search(next_status);
         int next_score = GetScore();
         int next_potential = 10000 * next_score + GetCanMove();
