@@ -108,12 +108,12 @@ struct Solver {
           continue;
         }
         stk.emplace_back(y, x, d, -1);
-        visited_one_path[y][x] = true;
-        visited_any_path[y][x] = true;
         if (is_border[y][x]) {
           // goal
           FillVisitedOverAll();
         } else {
+          visited_one_path[y][x] = true;
+          visited_any_path[y][x] = true;
           assert(IsOutside(y, x) == false);
           int nd = -1;
           REP(i, 4) {
@@ -153,8 +153,7 @@ struct Solver {
     }
   }
 
-  int GetScore(const vector<vector<char>> &maze) {
-    Search(maze);
+  int GetScore() {
     int c = 0;
     REP(y, H) {
       REP(x, W) {
@@ -165,8 +164,8 @@ struct Solver {
     return c;
   }
 
-  int GetScorePlusCanMove(const vector<vector<char>> &maze) {
-    int c = GetScore(maze);
+  int GetCanMove() {
+    int c = 0;
     REP(y, H) {
       REP(x, W) {
         if (visited_any_path[y][x])
@@ -212,48 +211,74 @@ struct Solver {
     }
   }
 
+  vector<int> Sample(int n, int k) {
+    vector<int> seq(n);
+    REP(i,n) {
+      seq[i] = i;
+    }
+    for(int i = n - 1; i > 0; --i) {
+      swap(seq[i], seq[xrand() % (i + 1)]);
+    }
+    seq.erase(seq.begin()+k, seq.end());
+    assert((int)seq.size() == k);
+    return seq;
+  }
+
   vector<string> Optimize() {
     double time_start = gettime();
-    double time_use = 100;
+    double time_use = 9.5;
     double time_end = time_start + time_use;
     double time_current;
 
     vector<vector<char>> best_status = M;
-    int best_score = GetScore(best_status);
+    Search(best_status);
+    int best_score = GetScore();
     vector<vector<char>> current_status = best_status;
-    int current_score = best_score;
+    int current_potential = 10000*best_score + GetCanMove();
     vector<vector<bool>> current_visited = visited_any_path;
     vector<vector<bool>> current_pointed = visited_over_all;
+    int current_fixed = CountFixedCell(current_status);
 
     while ((time_current = gettime()) < time_end) {
       vector<int> ys, xs;
       CreateCandidatePoint(current_status, current_visited, current_pointed, ys, xs);
       assert(xs.size() == ys.size());
-      int rand_index = xrand() % ys.size();
-      int move_y = ys[rand_index];
-      int move_x = xs[rand_index];
       vector<vector<char>> next_status = current_status;
-      char move_d = "SLUR"[xrand() % 4];
-      next_status[move_y][move_x] = move_d;
-      if (CountFixedCell(next_status) > F)
-        continue;
-      int next_score = GetScorePlusCanMove(next_status);
+      const int mul = 1;
+      // const int mul = 100;
+      // const int mul = min<int>(xs.size(), max<int>(1, 0.005 * (F - current_fixed)));
+      // const int mul = min<int>(xs.size(), max<int>(1, 100 * (time_end - time_current) / time_use));
+      REP(i,mul) {
+        int rand_index = xrand() % xs.size();
+        int move_y = ys[rand_index];
+        int move_x = xs[rand_index];
+        char move_d = "SLUR"[xrand() % 4];
+        char tmp = next_status[move_y][move_x];
+        next_status[move_y][move_x] = move_d;
+        if (CountFixedCell(next_status) > F) {
+          next_status[move_y][move_x] = tmp;
+          break;
+        }
+      }
+      Search(next_status);
+      int next_score = GetScore();
       if (best_score < next_score) {
         best_score = next_score;
         best_status = next_status;
-#ifndef NDEBUG
+#ifdef LOCAL
         cerr << "[" << time_current - time_start << "] best_score = " << best_score << endl;
 #endif
       }
-      double prob = 1.0 * xrand() / ULONG_MAX;
-      // bool force_next = time_use * prob < (time_end - time_current);
+      int next_potential = 10000*next_score + GetCanMove();
+      // bool force_next = xrand() / (1.0 + ULONG_MAX) < (time_end - time_current)/time_use;
       bool force_next = false;
-      if (current_score < next_score || force_next) {
-        current_score = next_score;
+      if (current_potential < next_potential || force_next) {
+        current_potential = next_potential;
         current_status = next_status;
         current_visited = visited_any_path;
         current_pointed = visited_over_all;
-        // cerr << "[" << time_current << "] current_score = " << current_score << endl;
+        current_fixed = CountFixedCell(next_status);
+        // cerr << "[" << time_current - time_start << "] current_potential = " << current_potential << endl;
       }
     }
 
@@ -265,7 +290,7 @@ struct Solver {
         }
       }
     }
-#ifndef NDEBUG
+#ifdef LOCAL
     cerr << "R/F = " << ret.size() << "/" << F << endl;
 #endif
     assert((int)ret.size() <= F);
@@ -274,7 +299,14 @@ struct Solver {
 
   vector<string> Improve() {
     SetUpBorder();
-    return Optimize();
+#ifdef ENABLE_PROFILE
+    ProfilerStart("./pprof.out");
+#endif
+    vector<string> ret = Optimize();
+#ifdef ENABLE_PROFILE
+  ProfilerStop();
+#endif
+  return ret;
   }
 };
 
@@ -284,17 +316,7 @@ struct MazeFixing {
   }
 };
 
-vector<string> improve(vector<string> maze, int F) {
-#ifdef ENABLE_PROFILE
-  ProfilerStart("./pprof.out");
-#endif
-  return Solver(maze, F).Improve();
-#ifdef ENABLE_PROFILE
-  ProfilerStop();
-#endif
-}
-
-#if LOCAL
+#ifdef LOCAL
 int main() {
   // height: [10, 80]
   int H;
@@ -307,7 +329,8 @@ int main() {
   // fixes: [N/10, N/3], N is the number of non '.' cells in the maze
   int F;
   cin >> F;
-  vector<string> ret = improve(maze, F);
+  MazeFixing maze_fixing;
+  vector<string> ret = maze_fixing.improve(maze, F);
   cout << ret.size() << endl;
   REP(i, ret.size()) {
     cout << ret[i] << endl;

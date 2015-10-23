@@ -15,6 +15,7 @@ java MazeFixingVis -exec ./mm89 -seed 1 -debug -vis
 * "A path can visit any cell only once, but different paths can visit same cell." なので，'S'でループになってもアウト
 * せめてあと5倍は早くしよう
 * Fを使い切れていない。Greedyに到達マスを増やしてから焼きなまし？
+* 正確な評価難しいよね？？？高速化できなくね？？？
 
 # How to profile
 
