@@ -46,3 +46,4 @@ java MazeFixingVis -exec "perf record -o perf.data ./mm89" -vis -debug -seed 10
 * https://community.topcoder.com/longcontest/?module=ViewProblemStatement&rd=16494&compid=12525
 * http://shindannin.hatenadiary.com/entry/20121224/1356364040
 * https://github.com/arosh/arosh.github.com/wiki/Debug
+* https://topcoder.g.hatena.ne.jp/CKomaki/20141202/1418158488
